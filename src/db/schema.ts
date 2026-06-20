@@ -1,4 +1,4 @@
-import * as SQLite from "expo-sqlite";
+import {SQLiteDatabase, openDatabaseAsync} from "expo-sqlite";
 
 const DB_NAME = "poker_calculator.db";
 export const TABLES = ["Card", "Game", "Player", "Game_Card", "Game_Player"] as const;
@@ -46,7 +46,7 @@ const SCHEMA_SQL = `
     PRAGMA foreign_keys = ON;
     PRAGMA journal_mode = WAL;
 
-    CREATE TABLE IF NOT EXISTS Card (
+    CREATE TABLE IF NOT EXISTS card (
         id TEXT PRIMARY KEY NOT NULL,
         suit TEXT NOT NULL,
         rank TEXT NOT NULL,
@@ -55,31 +55,31 @@ const SCHEMA_SQL = `
         CHECK (rank IN ('2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'))
     );
 
-    CREATE TABLE IF NOT EXISTS Player (
+    CREATE TABLE IF NOT EXISTS player (
         id TEXT PRIMARY KEY NOT NULL,
         name TEXT NOT NULL
     );
 
-    CREATE TABLE IF NOT EXISTS Game (
+    CREATE TABLE IF NOT EXISTS game (
         id TEXT PRIMARY KEY NOT NULL,
         winnerId TEXT,
         status TEXT NOT NULL,
         start_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
         end_at TEXT,
-        FOREIGN KEY (winnerId) REFERENCES Player(id),
+        FOREIGN KEY (winnerId) REFERENCES player(id),
         CHECK (end_at IS NULL OR start_at < end_at),
         CHECK (status IN ('ongoing', 'completed'))
     );
 
-    CREATE TABLE IF NOT EXISTS Game_Card (
+    CREATE TABLE IF NOT EXISTS game_card (
         id TEXT PRIMARY KEY NOT NULL,
         gameId TEXT NOT NULL,
         playerId TEXT,
         cardId TEXT NOT NULL,
         location TEXT NOT NULL,
-        FOREIGN KEY (cardId) REFERENCES Card(id),
-        FOREIGN KEY (playerId) REFERENCES Player(id),
-        FOREIGN KEY (gameId) REFERENCES Game(id) ON DELETE CASCADE,
+        FOREIGN KEY (cardId) REFERENCES card(id),
+        FOREIGN KEY (playerId) REFERENCES player(id),
+        FOREIGN KEY (gameId) REFERENCES game(id) ON DELETE CASCADE,
         CHECK (location IN ('deck', 'player', 'community', 'burned')),
         CHECK (
             (location = 'player' AND playerId IS NOT NULL)
@@ -89,38 +89,38 @@ const SCHEMA_SQL = `
         UNIQUE (gameId, cardId)
     );
 
-    CREATE TABLE IF NOT EXISTS Game_Player (
+    CREATE TABLE IF NOT EXISTS game_player (
         id TEXT PRIMARY KEY NOT NULL,
         gameId TEXT NOT NULL,
         playerId TEXT NOT NULL,
         status TEXT NOT NULL,
         odds REAL,
-        FOREIGN KEY (playerId) REFERENCES Player(id),
-        FOREIGN KEY (gameId) REFERENCES Game(id) ON DELETE CASCADE,
+        FOREIGN KEY (playerId) REFERENCES player(id),
+        FOREIGN KEY (gameId) REFERENCES game(id) ON DELETE CASCADE,
         CHECK (status IN ('active', 'folded')),
         CHECK (odds IS NULL OR (odds >= 0 AND odds <= 1)),
         UNIQUE (gameId, playerId)
     );
 
     CREATE INDEX IF NOT EXISTS idx_game_card_gameId 
-    ON Game_Card(gameId);
+    ON game_card(gameId);
 
     CREATE INDEX IF NOT EXISTS idx_game_card_playerId 
-    ON Game_Card(playerId);
+    ON game_card(playerId);
 
     CREATE INDEX IF NOT EXISTS idx_game_player_gameId 
-    ON Game_Player(gameId);
+    ON game_player(gameId);
 
     CREATE INDEX IF NOT EXISTS idx_game_player_playerId 
-    ON Game_Player(playerId);
+    ON game_player(playerId);
 `;
 
-let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
+let dbPromise: Promise<SQLiteDatabase> | null = null;
 
-export function createDatabase(): Promise<SQLite.SQLiteDatabase> {
+export function createDatabase(): Promise<SQLiteDatabase> {
     if (dbPromise) return dbPromise;
     dbPromise = (async () => {
-        const db = await SQLite.openDatabaseAsync(DB_NAME);
+        const db = await openDatabaseAsync(DB_NAME);
         await db.execAsync(SCHEMA_SQL);
         return db;
     })();
